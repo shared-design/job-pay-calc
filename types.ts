@@ -20,15 +20,24 @@ export enum TaxStatus {
   ERROR = 'ERROR'
 }
 
-export type JobCategory = 'Retail' | 'Hospitality' | 'Transport' | 'Warehouse' | 'General';
+export type JobCategory = 
+  | 'Transport / Trucking' 
+  | 'Warehouse / Logistics' 
+  | 'Healthcare' 
+  | 'Retail' 
+  | 'Hospitality' 
+  | 'General';
 
 export interface PenaltyRates {
+  night: number;
   saturday: number;
   sunday: number;
-  overtime: number;
+  publicHoliday: number;
+  overtime1: number;
+  overtime2: number;
 }
 
-export interface JobAdAnalysisResponse {
+export interface JobRateSuggestionResponse {
   category: JobCategory;
   rates: PenaltyRates;
   reasoning: string;

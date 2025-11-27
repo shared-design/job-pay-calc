@@ -12,12 +12,23 @@ export interface UserInputs {
   totalHours: string;
   shiftsInput: string;
   // Penalty configs
+  nightRate?: string;
+  nightHours?: string;
   satRate?: string;
   satHours?: string;
   sunRate?: string;
   sunHours?: string;
+  phRate?: string;
+  phHours?: string;
+  ot1Rate?: string;
+  ot1Hours?: string;
+  ot2Rate?: string;
+  ot2Hours?: string;
+  
+  // Legacy fields
   otRate?: string;
   otHours?: string;
+
   showPenalties?: boolean;
 }
 

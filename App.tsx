@@ -42,15 +42,25 @@ const App: React.FC = () => {
     return loadLastInputs()?.showPenalties ?? false;
   });
 
+  // Loadings (Part of shift)
+  const [nightRate, setNightRate] = useState<string>(() => loadLastInputs()?.nightRate ?? '115');
+  const [nightHours, setNightHours] = useState<string>(() => loadLastInputs()?.nightHours ?? '0');
+  
   const [satRate, setSatRate] = useState<string>(() => loadLastInputs()?.satRate ?? '150');
   const [satHours, setSatHours] = useState<string>(() => loadLastInputs()?.satHours ?? '0');
   
   const [sunRate, setSunRate] = useState<string>(() => loadLastInputs()?.sunRate ?? '200');
   const [sunHours, setSunHours] = useState<string>(() => loadLastInputs()?.sunHours ?? '0');
 
-  const [otRate, setOtRate] = useState<string>(() => loadLastInputs()?.otRate ?? '150');
-  const [otHours, setOtHours] = useState<string>(() => loadLastInputs()?.otHours ?? '0');
+  const [phRate, setPhRate] = useState<string>(() => loadLastInputs()?.phRate ?? '250');
+  const [phHours, setPhHours] = useState<string>(() => loadLastInputs()?.phHours ?? '0');
 
+  // Overtime (Extra hours)
+  const [ot1Rate, setOt1Rate] = useState<string>(() => loadLastInputs()?.ot1Rate ?? loadLastInputs()?.otRate ?? '150');
+  const [ot1Hours, setOt1Hours] = useState<string>(() => loadLastInputs()?.ot1Hours ?? loadLastInputs()?.otHours ?? '0');
+
+  const [ot2Rate, setOt2Rate] = useState<string>(() => loadLastInputs()?.ot2Rate ?? '200');
+  const [ot2Hours, setOt2Hours] = useState<string>(() => loadLastInputs()?.ot2Hours ?? '0');
 
   // Effect to save Settings when they change
   useEffect(() => {
@@ -68,17 +78,23 @@ const App: React.FC = () => {
       paidHours,
       totalHours,
       shiftsInput,
+      nightRate, nightHours,
       satRate, satHours,
       sunRate, sunHours,
-      otRate, otHours,
+      phRate, phHours,
+      ot1Rate, ot1Hours,
+      ot2Rate, ot2Hours,
       showPenalties
     });
-  }, [hourlyRate, paidHours, totalHours, shiftsInput, satRate, satHours, sunRate, sunHours, otRate, otHours, showPenalties]);
+  }, [hourlyRate, paidHours, totalHours, shiftsInput, nightRate, nightHours, satRate, satHours, sunRate, sunHours, phRate, phHours, ot1Rate, ot1Hours, ot2Rate, ot2Hours, showPenalties]);
 
   const handleApplyAutoRates = (rates: PenaltyRates) => {
+    setNightRate(rates.night.toString());
     setSatRate(rates.saturday.toString());
     setSunRate(rates.sunday.toString());
-    setOtRate(rates.overtime.toString());
+    setPhRate(rates.publicHoliday.toString());
+    setOt1Rate(rates.overtime1.toString());
+    setOt2Rate(rates.overtime2.toString());
   };
 
   // Calculations
@@ -97,23 +113,31 @@ const App: React.FC = () => {
     const baseWeeklyTotalHours = tHours * shiftsPerWeek;
     const baseGross = rate * baseWeeklyPaidHours;
 
-    // Penalty Calculations
-    // 1. Loadings (Sat/Sun): Assumed to be PART of the shifts, so we add the "top up" amount.
-    // e.g. 150% rate = 1.0 (already in baseGross) + 0.5 (loading)
-    const sRate = parseFloat(satRate) || 0;
-    const sHours = parseFloat(satHours) || 0;
-    const satLoadingAmount = sHours * rate * Math.max(0, (sRate - 100) / 100);
+    // Helper for loading calc: Hours * Rate * (Multiplier - 1)
+    const calcLoading = (rStr: string, hStr: string) => {
+      const r = parseFloat(rStr) || 0;
+      const h = parseFloat(hStr) || 0;
+      return h * rate * Math.max(0, (r - 100) / 100);
+    };
 
-    const suRate = parseFloat(sunRate) || 0;
-    const suHours = parseFloat(sunHours) || 0;
-    const sunLoadingAmount = suHours * rate * Math.max(0, (suRate - 100) / 100);
-
-    // 2. Overtime: Assumed to be EXTRA hours on top of shifts
-    const oRate = parseFloat(otRate) || 0;
-    const oHours = parseFloat(otHours) || 0;
-    const otAmount = oHours * rate * (oRate / 100);
+    // Helper for OT calc: Hours * Rate * Multiplier (Full pay)
+    const calcOt = (rStr: string, hStr: string) => {
+      const r = parseFloat(rStr) || 0;
+      const h = parseFloat(hStr) || 0;
+      return h * rate * (r / 100);
+    };
     
-    const grossWeekly = baseGross + satLoadingAmount + sunLoadingAmount + otAmount;
+    // 1. Loadings (Top-up on base hours)
+    const nightLoading = calcLoading(nightRate, nightHours);
+    const satLoading = calcLoading(satRate, satHours);
+    const sunLoading = calcLoading(sunRate, sunHours);
+    const phLoading = calcLoading(phRate, phHours);
+
+    // 2. Overtime (Extra hours)
+    const ot1Pay = calcOt(ot1Rate, ot1Hours);
+    const ot2Pay = calcOt(ot2Rate, ot2Hours);
+    
+    const grossWeekly = baseGross + nightLoading + satLoading + sunLoading + phLoading + ot1Pay + ot2Pay;
     const grossYearly = grossWeekly * 52;
     
     // Simple tax calc
@@ -123,8 +147,11 @@ const App: React.FC = () => {
     const netYearly = grossYearly * taxMultiplier;
 
     // Effective Rate: (Total Pay) / (Total Hours Worked)
-    // Total Hours = Base Shifts Hours + Overtime Hours (Sat/Sun hours are part of base shifts)
-    const finalTotalHours = baseWeeklyTotalHours + oHours;
+    // Total Hours = Base Shifts Hours + Overtime Hours
+    const ot1H = parseFloat(ot1Hours) || 0;
+    const ot2H = parseFloat(ot2Hours) || 0;
+    
+    const finalTotalHours = baseWeeklyTotalHours + ot1H + ot2H;
     const effectiveHourlyRate = finalTotalHours > 0 ? grossWeekly / finalTotalHours : 0;
 
     return {
@@ -134,11 +161,11 @@ const App: React.FC = () => {
       netYearly,
       effectiveHourlyRate
     };
-  }, [hourlyRate, paidHours, totalHours, shiftsInput, shiftFrequency, taxRate, satRate, satHours, sunRate, sunHours, otRate, otHours]);
+  }, [hourlyRate, paidHours, totalHours, shiftsInput, shiftFrequency, taxRate, nightRate, nightHours, satRate, satHours, sunRate, sunHours, phRate, phHours, ot1Rate, ot1Hours, ot2Rate, ot2Hours]);
 
   // Check if there is a significant difference to show the "Real Rate" warning
   const showEffectiveRate = results.effectiveHourlyRate > 0 && 
-    (parseFloat(hourlyRate) - results.effectiveHourlyRate) > 0.01;
+    Math.abs(parseFloat(hourlyRate) - results.effectiveHourlyRate) > 0.01;
 
   // Render the frequency toggle
   const renderFrequencyToggle = (
@@ -157,9 +184,31 @@ const App: React.FC = () => {
           shiftFrequency === 'fortnight' ? 'bg-slate-600 text-white' : 'text-slate-500 hover:text-slate-300'
         }`}
       >
-        Fortnightly
+        F/N
       </button>
     </div>
+  );
+
+  const PenaltyRow = ({ label, rate, setRate, hours, setHours, subLabel }: any) => (
+    <>
+      <div className="text-sm font-medium text-slate-300 py-2.5 flex flex-col justify-center">
+        {label}
+        {subLabel && <span className="text-[10px] text-slate-600 font-normal">{subLabel}</span>}
+      </div>
+      <input 
+        type="number" 
+        value={rate} 
+        onChange={e => setRate(e.target.value)}
+        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none h-10" 
+      />
+      <input 
+        type="number" 
+        value={hours} 
+        onChange={e => setHours(e.target.value)}
+        placeholder="0"
+        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none h-10" 
+      />
+    </>
   );
 
   return (
@@ -257,66 +306,51 @@ const App: React.FC = () => {
                   
                   <JobTypeHelper onApplyRates={handleApplyAutoRates} />
 
-                  <div className="grid grid-cols-[1fr_80px_80px] gap-2 items-end">
+                  <div className="grid grid-cols-[1fr_70px_70px] gap-2 items-center">
                       <span className="text-[10px] font-bold text-slate-500 uppercase pb-1">Type</span>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase pb-1">Rate %</span>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase pb-1">Hours</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase pb-1 text-center">Rate %</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase pb-1 text-center">Hours</span>
                       
-                      {/* Saturday */}
-                      <div className="text-sm font-medium text-slate-300 py-3 flex flex-col justify-center">
-                        Saturday
-                        <span className="text-[10px] text-slate-600 font-normal">In standard shifts</span>
+                      <div className="col-span-3 text-[10px] font-bold text-emerald-500/80 uppercase mt-1 mb-1 tracking-wider">
+                        Loadings (Included in shifts)
                       </div>
-                      <input 
-                        type="number" 
-                        value={satRate} 
-                        onChange={e => setSatRate(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+
+                      <PenaltyRow 
+                        label="Night Shift" 
+                        rate={nightRate} setRate={setNightRate} 
+                        hours={nightHours} setHours={setNightHours} 
                       />
-                      <input 
-                        type="number" 
-                        value={satHours} 
-                        onChange={e => setSatHours(e.target.value)}
-                        placeholder="0"
-                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      <PenaltyRow 
+                        label="Saturday" 
+                        rate={satRate} setRate={setSatRate} 
+                        hours={satHours} setHours={setSatHours} 
+                      />
+                      <PenaltyRow 
+                        label="Sunday" 
+                        rate={sunRate} setRate={setSunRate} 
+                        hours={sunHours} setHours={setSunHours} 
+                      />
+                      <PenaltyRow 
+                        label="Public Holiday" 
+                        rate={phRate} setRate={setPhRate} 
+                        hours={phHours} setHours={setPhHours} 
                       />
 
-                      {/* Sunday */}
-                      <div className="text-sm font-medium text-slate-300 py-3 flex flex-col justify-center">
-                        Sunday
-                         <span className="text-[10px] text-slate-600 font-normal">In standard shifts</span>
+                      <div className="col-span-3 text-[10px] font-bold text-emerald-500/80 uppercase mt-3 mb-1 tracking-wider">
+                        Overtime (Extra hours)
                       </div>
-                      <input 
-                        type="number" 
-                        value={sunRate} 
-                        onChange={e => setSunRate(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
-                      />
-                      <input 
-                        type="number" 
-                        value={sunHours} 
-                        onChange={e => setSunHours(e.target.value)}
-                        placeholder="0"
-                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
-                      />
 
-                      {/* Overtime */}
-                      <div className="text-sm font-medium text-slate-300 py-3 flex flex-col justify-center">
-                        Overtime
-                         <span className="text-[10px] text-slate-600 font-normal">Extra hours</span>
-                      </div>
-                      <input 
-                        type="number" 
-                        value={otRate} 
-                        onChange={e => setOtRate(e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      <PenaltyRow 
+                        label="Overtime (1x)" 
+                        subLabel="First 2 hours usually"
+                        rate={ot1Rate} setRate={setOt1Rate} 
+                        hours={ot1Hours} setHours={setOt1Hours} 
                       />
-                      <input 
-                        type="number" 
-                        value={otHours} 
-                        onChange={e => setOtHours(e.target.value)}
-                        placeholder="0"
-                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      <PenaltyRow 
+                        label="Overtime (2x)" 
+                        subLabel="After 2 hours"
+                        rate={ot2Rate} setRate={setOt2Rate} 
+                        hours={ot2Hours} setHours={setOt2Hours} 
                       />
                   </div>
                </div>
@@ -358,7 +392,7 @@ const App: React.FC = () => {
                 </span>
               </div>
               <p className="text-[10px] text-amber-300/60 mt-0.5">
-                adjusted for unpaid breaks
+                adjusted for breaks & penalties
               </p>
             </div>
           </div>
@@ -395,12 +429,12 @@ const App: React.FC = () => {
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Work Hours</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Hours</span>
                 <span className="text-xl font-semibold text-slate-200">
                   {results.effectiveHourlyRate > 0 
-                     ? (results.grossWeekly / results.effectiveHourlyRate).toFixed(1)
+                     ? ((results.grossWeekly / results.effectiveHourlyRate) * (shiftFrequency === 'fortnight' ? 2 : 1)).toFixed(1)
                      : '0' 
-                  } <span className="text-sm font-normal text-slate-500">/ wk</span>
+                  } <span className="text-sm font-normal text-slate-500">{shiftFrequency === 'fortnight' ? '/ fn' : '/ wk'}</span>
                 </span>
               </div>
            </div>

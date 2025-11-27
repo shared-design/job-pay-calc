@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { TaxEstimateResponse, JobAdAnalysisResponse } from "../types";
+import { TaxEstimateResponse, JobRateSuggestionResponse } from "../types";
 
 const ESTIMATE_TAX_SYSTEM_PROMPT = `
 You are a helpful tax estimation assistant. 
@@ -9,14 +9,19 @@ Do not calculate exact pennies, but give a solid estimate for planning purposes.
 If the location is ambiguous, assume the most populous region for that name (e.g., "CA" -> "California, USA").
 `;
 
-const ANALYZE_JOB_SYSTEM_PROMPT = `
+const SUGGEST_RATES_SYSTEM_PROMPT = `
 You are an Australian Payroll and Award Wage expert.
-Your goal is to analyze job advertisement text and:
-1. Categorize the job into one of: 'Retail', 'Hospitality', 'Transport', 'Warehouse', 'General'.
-2. Suggest conservative, standard penalty rate percentages (integers) for Saturday, Sunday, and Overtime based on common Awards (like HIGA, Retail Award) or explicit text in the ad.
-   - If the ad mentions specific rates (e.g., "time and a half"), use those (150).
-   - If not, use typical Casual loading assumptions (e.g. Sat 150%, Sun 175% or 200%).
-   - Return integers representing the percentage (e.g., 150 for 1.5x, 200 for 2.0x).
+Your goal is to accept a Job Title and:
+1. Categorize it into one of: 'Transport / Trucking', 'Warehouse / Logistics', 'Healthcare', 'Retail', 'Hospitality', 'General'.
+2. Suggest conservative, standard penalty rate percentages (integers) for:
+   - Night Shift (e.g., 115, 125, 130)
+   - Saturday (e.g., 125, 150)
+   - Sunday (e.g., 150, 175, 200)
+   - Public Holiday (e.g., 200, 225, 250)
+   - Overtime 1 (First 2 hours, e.g., 150)
+   - Overtime 2 (After 2 hours, e.g., 200)
+   
+   Return integers representing the percentage (e.g., 150 for 1.5x, 200 for 2.0x).
 `;
 
 const getAiClient = () => {
@@ -75,17 +80,17 @@ export const getTaxEstimate = async (
   }
 };
 
-export const analyzeJobAd = async (
-  jobAdText: string
-): Promise<JobAdAnalysisResponse> => {
+export const suggestRatesForJob = async (
+  jobTitle: string
+): Promise<JobRateSuggestionResponse> => {
   const ai = getAiClient();
 
   const prompt = `
-    Job Ad Text: "${jobAdText.slice(0, 1000)}"
+    Job Title: "${jobTitle}"
     
-    Analyze this text. 
+    Analyze this job title. 
     1. Identify the industry category.
-    2. Extract or estimate Saturday, Sunday, and Overtime penalty percentages.
+    2. Estimate standard penalty percentages for Night, Sat, Sun, Public Holiday, and Overtime.
   `;
 
   try {
@@ -93,21 +98,31 @@ export const analyzeJobAd = async (
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
-        systemInstruction: ANALYZE_JOB_SYSTEM_PROMPT,
+        systemInstruction: SUGGEST_RATES_SYSTEM_PROMPT,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             category: {
               type: Type.STRING,
-              enum: ['Retail', 'Hospitality', 'Transport', 'Warehouse', 'General'],
+              enum: [
+                'Transport / Trucking', 
+                'Warehouse / Logistics', 
+                'Healthcare', 
+                'Retail', 
+                'Hospitality', 
+                'General'
+              ],
             },
             rates: {
               type: Type.OBJECT,
               properties: {
+                night: { type: Type.INTEGER },
                 saturday: { type: Type.INTEGER },
                 sunday: { type: Type.INTEGER },
-                overtime: { type: Type.INTEGER }
+                publicHoliday: { type: Type.INTEGER },
+                overtime1: { type: Type.INTEGER },
+                overtime2: { type: Type.INTEGER }
               }
             },
             reasoning: {
@@ -122,9 +137,9 @@ export const analyzeJobAd = async (
     const text = response.text;
     if (!text) throw new Error("No response from AI");
 
-    return JSON.parse(text) as JobAdAnalysisResponse;
+    return JSON.parse(text) as JobRateSuggestionResponse;
   } catch (error) {
-    console.error("Error analyzing job ad:", error);
-    throw new Error("Failed to analyze job ad.");
+    console.error("Error analyzing job:", error);
+    throw new Error("Failed to analyze job.");
   }
 };
