@@ -4,6 +4,19 @@ export interface PayDetails {
   netWeekly: number;
   netYearly: number;
   effectiveHourlyRate: number;
+  totalHours: number;
+}
+
+export interface TaxEstimateResponse {
+  rate: number;
+  explanation: string;
+}
+
+export enum TaxStatus {
+  IDLE = 'IDLE',
+  LOADING = 'LOADING',
+  SUCCESS = 'SUCCESS',
+  ERROR = 'ERROR'
 }
 
 export type RosterPattern = 'same_days' | 'different_days';

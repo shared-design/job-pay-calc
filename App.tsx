@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CalculatorInput } from './components/CalculatorInput';
-import { ResultCard } from './components/ResultCard';
 import { RosterHelper } from './components/RosterHelper';
-import { DollarSign, Clock, CalendarDays, Percent, AlertCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Clock, CalendarDays, Percent, AlertCircle, Info, ChevronDown, ChevronUp, Sun, Moon } from 'lucide-react';
 import { PayDetails, RosterPattern, DayOverrides } from './types';
 import { loadSettings, loadLastInputs, saveSettings, saveLastInputs } from './services/storageService';
 
 const App: React.FC = () => {
+  // Theme State
+  const [isDark, setIsDark] = useState<boolean>(true);
+
   // Initialize state with values from storage or defaults
   const [isCasual, setIsCasual] = useState<boolean>(() => {
     return loadSettings()?.isCasual ?? false;
@@ -107,7 +109,6 @@ const App: React.FC = () => {
   // Logic to update a specific day in the grid
   const updateDayOverride = (dayId: string, field: 'normalHours' | 'overtimeHours' | 'overtimeMultiplier', value: number) => {
     setDayOverrides(prev => {
-      // Get current state or calculate default for this specific day
       const net = getNetShiftHours();
       const defaults = getDefaultBreakdown(net);
       
@@ -147,10 +148,8 @@ const App: React.FC = () => {
 
     if (!showOvertimeDetails) {
       // SIMPLE MODE
-      // Just NetHours * Count
       totalWorkHours = netShiftHours * shifts.length;
       totalNormalHours = totalWorkHours; 
-      // In simple mode, we treat all as "Normal" for gross calc
     } else {
       // ADVANCED MODE (Grid)
       shifts.forEach(dayId => {
@@ -182,10 +181,8 @@ const App: React.FC = () => {
     const grossYearly = grossWeekly * 52;
     
     // Tax Calculation
-    // Strip non-numeric/decimal characters to handle input like "25%"
     const cleanTaxRate = taxRate.replace(/[^0-9.]/g, '');
     const parsedTax = parseFloat(cleanTaxRate);
-    // Default to 30 if empty or invalid
     const effectiveTax = isNaN(parsedTax) || cleanTaxRate === '' ? 30 : parsedTax;
     
     const taxMultiplier = 1 - (effectiveTax / 100);
@@ -199,7 +196,8 @@ const App: React.FC = () => {
       grossYearly,
       netWeekly,
       netYearly,
-      effectiveHourlyRate
+      effectiveHourlyRate,
+      totalHours: totalWorkHours
     };
   }, [hourlyRate, shiftHours, isBreakPaid, unpaidBreakLength, shiftsInput, rosterPattern, customRosterDays, showOvertimeDetails, dayOverrides, taxRate]);
 
@@ -213,40 +211,56 @@ const App: React.FC = () => {
   const showEffectiveRate = results.effectiveHourlyRate > 0 && 
     Math.abs(parseFloat(hourlyRate) - results.effectiveHourlyRate) > 0.01;
 
+  const yearlyTax = results.grossYearly - results.netYearly;
+
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center py-6 px-4 md:py-12">
+    <div className={`min-h-screen flex flex-col items-center py-6 px-4 md:py-12 transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-slate-100'}`}>
       <div className="w-full max-w-md space-y-6">
         
         {/* Header */}
-        <header className="text-center space-y-2 mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-emerald-500/10 rounded-2xl mb-2">
-            <DollarSign className="text-emerald-400 w-8 h-8" />
+        <header className="relative text-center space-y-2 mb-8">
+           <button 
+             onClick={() => setIsDark(!isDark)}
+             className={`absolute top-0 right-0 p-2 rounded-full transition-colors ${isDark ? 'bg-slate-800 text-amber-400' : 'bg-white text-slate-600 shadow-sm border border-slate-200'}`}
+             aria-label="Toggle theme"
+           >
+             {isDark ? <Sun size={20} /> : <Moon size={20} />}
+           </button>
+
+          <div className={`inline-flex items-center justify-center p-3 rounded-2xl mb-2 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-100'}`}>
+            <DollarSign className={`w-8 h-8 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">PocketPay</h1>
-          <p className="text-slate-400 text-sm">Job Pay Calculator</p>
+          <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>PocketPay</h1>
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Job Pay Calculator</p>
         </header>
 
         {/* Calculator Inputs */}
-        <section className="bg-slate-900/50 backdrop-blur-sm p-6 rounded-3xl border border-slate-800 shadow-xl space-y-5">
+        <section className={`p-6 rounded-3xl border shadow-xl space-y-5 transition-colors duration-300 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-slate-200/50'}`}>
           
           {/* Employment Type Toggle */}
           <div className="flex flex-col gap-3">
-            <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 relative">
+            <div className={`flex p-1 rounded-xl border relative ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
               <button
                 onClick={() => setIsCasual(false)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 z-10 ${!isCasual ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 z-10 
+                  ${!isCasual 
+                    ? (isDark ? 'bg-slate-700 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm border border-slate-200') 
+                    : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}
               >
                 Permanent
               </button>
               <button
                 onClick={() => setIsCasual(true)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 z-10 ${isCasual ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 z-10 
+                  ${isCasual 
+                    ? 'bg-emerald-600 text-white shadow-sm' 
+                    : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}
               >
                 Casual
               </button>
             </div>
             {isCasual && (
-              <div className="flex items-start gap-2 px-1 text-xs text-emerald-400/90">
+              <div className={`flex items-start gap-2 px-1 text-xs ${isDark ? 'text-emerald-400/90' : 'text-emerald-700/90'}`}>
                 <Info size={14} className="mt-0.5 shrink-0" />
                 <p>Casual rates usually include a ~25% loading.</p>
               </div>
@@ -259,6 +273,7 @@ const App: React.FC = () => {
             onChange={setHourlyRate}
             icon={<DollarSign size={18} />}
             placeholder="0.00"
+            isDark={isDark}
           />
 
           <RosterHelper 
@@ -266,6 +281,7 @@ const App: React.FC = () => {
             selectedDays={customRosterDays}
             onPatternChange={handleRosterPatternChange}
             onDaysChange={handleRosterDaysChange}
+            isDark={isDark}
           />
 
           {rosterPattern === 'different_days' && (
@@ -275,10 +291,11 @@ const App: React.FC = () => {
               onChange={setShiftsInput}
               icon={<CalendarDays size={18} />}
               placeholder="5"
+              isDark={isDark}
             />
           )}
           
-          <div className="border-t border-slate-800 my-4"></div>
+          <div className={`border-t my-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}></div>
 
           {/* Shift Details */}
           <CalculatorInput
@@ -287,23 +304,24 @@ const App: React.FC = () => {
             onChange={setShiftHours}
             icon={<Clock size={18} />}
             placeholder="8"
+            isDark={isDark}
           />
 
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center px-1">
-              <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+              <label className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 Is your meal break paid?
               </label>
-              <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-800">
+              <div className={`flex rounded-lg p-0.5 border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                 <button 
                   onClick={() => setIsBreakPaid(true)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${isBreakPaid ? 'bg-emerald-600 text-white' : 'text-slate-500'}`}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${isBreakPaid ? 'bg-emerald-600 text-white' : (isDark ? 'text-slate-500' : 'text-slate-500')}`}
                 >
                   Yes
                 </button>
                 <button 
                   onClick={() => setIsBreakPaid(false)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${!isBreakPaid ? 'bg-slate-700 text-white' : 'text-slate-500'}`}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${!isBreakPaid ? (isDark ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-500'}`}
                 >
                   No
                 </button>
@@ -318,8 +336,9 @@ const App: React.FC = () => {
                   onChange={setUnpaidBreakLength}
                   placeholder="0.5"
                   step="0.1"
+                  isDark={isDark}
                 />
-                <p className="text-[10px] text-slate-500 px-1 mt-1">
+                <p className={`text-[10px] px-1 mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   We've assumed a 30 minute unpaid break. Adjust if needed.
                 </p>
               </div>
@@ -327,10 +346,10 @@ const App: React.FC = () => {
           </div>
 
           {/* Overtime & Detailed Breakdown Toggle */}
-          <div className="border-t border-slate-800 pt-4">
+          <div className={`border-t pt-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
              <button 
                 onClick={() => setShowOvertimeDetails(!showOvertimeDetails)}
-                className="w-full flex justify-between items-center text-left text-sm font-semibold text-slate-300 hover:text-emerald-400 transition-colors py-2"
+                className={`w-full flex justify-between items-center text-left text-sm font-semibold transition-colors py-2 ${isDark ? 'text-slate-300 hover:text-emerald-400' : 'text-slate-700 hover:text-emerald-600'}`}
              >
                 <span>Penalty Rates & Overtime</span>
                 {showOvertimeDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -340,11 +359,11 @@ const App: React.FC = () => {
                <div className="mt-4 animate-in slide-in-from-top-2 fade-in space-y-4">
                   
                   {/* Grid Header */}
-                  <div className="grid grid-cols-[1fr_60px_60px_70px] gap-2 items-center text-center px-1">
-                     <div className="text-[10px] font-bold text-slate-500 uppercase text-left">Day</div>
-                     <div className="text-[10px] font-bold text-slate-500 uppercase leading-3">Normal Hrs</div>
-                     <div className="text-[10px] font-bold text-slate-500 uppercase leading-3">OT Hrs</div>
-                     <div className="text-[10px] font-bold text-slate-500 uppercase leading-3">OT Type</div>
+                  <div className={`grid grid-cols-[1fr_60px_60px_70px] gap-2 items-center text-center px-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                     <div className="text-[10px] font-bold uppercase text-left">Day</div>
+                     <div className="text-[10px] font-bold uppercase leading-3">Normal Hrs</div>
+                     <div className="text-[10px] font-bold uppercase leading-3">OT Hrs</div>
+                     <div className="text-[10px] font-bold uppercase leading-3">OT Type</div>
                   </div>
 
                   {/* Grid Rows */}
@@ -360,20 +379,24 @@ const App: React.FC = () => {
 
                       return (
                         <div key={dayId} className="grid grid-cols-[1fr_60px_60px_70px] gap-2 items-center">
-                          <span className="text-sm font-medium text-slate-300 truncate pl-1">{dayId}</span>
+                          <span className={`text-sm font-medium truncate pl-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{dayId}</span>
                           
                           <input 
                             type="number"
                             value={normal}
                             onChange={(e) => updateDayOverride(dayId, 'normalHours', parseFloat(e.target.value))}
-                            className="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-center text-xs text-white focus:border-emerald-500 outline-none w-full"
+                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full
+                              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}
+                            `}
                           />
                           
                           <input 
                             type="number"
                             value={ot}
                             onChange={(e) => updateDayOverride(dayId, 'overtimeHours', parseFloat(e.target.value))}
-                            className="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-center text-xs text-white focus:border-emerald-500 outline-none w-full"
+                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full
+                              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}
+                            `}
                           />
                           
                           <select
@@ -386,7 +409,9 @@ const App: React.FC = () => {
                                 updateDayOverride(dayId, 'overtimeMultiplier', parseFloat(val));
                               }
                             }}
-                            className="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:border-emerald-500 outline-none w-full appearance-none"
+                            className={`border rounded-lg p-1.5 text-xs focus:border-emerald-500 outline-none w-full appearance-none
+                              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}
+                            `}
                           >
                             <option value="1.5">1.5x</option>
                             <option value="2.0">2.0x</option>
@@ -397,14 +422,14 @@ const App: React.FC = () => {
                     })}
                   </div>
 
-                  <p className="text-[10px] text-slate-500 italic px-1 pt-2">
+                  <p className={`text-[10px] italic px-1 pt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     This is a simple estimate only and does not calculate exact award overtime rules. Adjust the hours and overtime type to match your usual week.
                   </p>
                </div>
              )}
           </div>
 
-          <div className="pt-4 border-t border-slate-800">
+          <div className={`pt-4 border-t ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
              <CalculatorInput
               label="Tax Estimate (%)"
               value={taxRate}
@@ -413,73 +438,109 @@ const App: React.FC = () => {
               placeholder="e.g. 25 — just a ballpark"
               type="text"
               tooltip="e.g. 25 — just a ballpark"
+              isDark={isDark}
             />
           </div>
         </section>
 
         {/* Effective Rate Warning */}
         {showEffectiveRate && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="p-2 bg-amber-500/20 rounded-full shrink-0">
-               <AlertCircle className="text-amber-400 w-5 h-5" />
+          <div className={`border rounded-2xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-500 ${isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+            <div className={`p-2 rounded-full shrink-0 ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
+               <AlertCircle className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
             </div>
             <div>
-              <p className="text-amber-200 text-xs font-bold uppercase tracking-wide">Real Hourly Rate</p>
+              <p className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>Real Hourly Rate</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-amber-50">
+                <span className={`text-2xl font-bold ${isDark ? 'text-amber-50' : 'text-amber-900'}`}>
                   {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(results.effectiveHourlyRate)}
                 </span>
-                <span className="text-xs text-amber-400/70 line-through">
+                <span className={`text-xs line-through ${isDark ? 'text-amber-400/70' : 'text-amber-700/50'}`}>
                   {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(hourlyRate) || 0)}
                 </span>
               </div>
-              <p className="text-[10px] text-amber-300/60 mt-0.5">
+              <p className={`text-[10px] mt-0.5 ${isDark ? 'text-amber-300/60' : 'text-amber-800/60'}`}>
                 adjusted for breaks & penalties
               </p>
             </div>
           </div>
         )}
 
-        {/* Results Grid */}
-        <section className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <ResultCard 
-              label="Weekly Take Home" 
-              amount={results.netWeekly} 
-              subLabel="Net Pay"
-              variant="primary"
-            />
-          </div>
-          <ResultCard 
-            label="Yearly Take Home" 
-            amount={results.netYearly} 
-            subLabel="Net Pay"
-          />
-          <div className="flex flex-col gap-4">
-            <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700/30 flex flex-col justify-center h-full">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Gross Weekly</span>
-              <span className="text-lg font-semibold text-slate-200">
-                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(results.grossWeekly)}
-              </span>
+        {/* UNIFIED RESULTS CARD */}
+        <section className={`rounded-3xl border shadow-2xl overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <div className="p-6">
+            
+            {/* WEEKLY SECTION */}
+            <div className="mb-6">
+              <h3 className={`text-xl font-bold tracking-tight mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Weekly Pay</h3>
+              <div className={`pb-3 mb-4 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                 <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                   Total hours per week: <span className={isDark ? 'text-slate-200' : 'text-slate-700'}>{results.totalHours.toFixed(1)}</span>
+                 </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Gross Weekly */}
+                <div className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-slate-50 border border-slate-100'}`}>
+                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Gross Weekly
+                  </span>
+                  <span className={`block text-lg font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(results.grossWeekly)}
+                  </span>
+                </div>
+                
+                {/* Take Home Weekly */}
+                <div className={`p-4 rounded-2xl relative overflow-hidden ${isDark ? 'bg-emerald-900/20 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
+                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    Take-Home Weekly
+                  </span>
+                  <span className={`block text-xl font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>
+                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(results.netWeekly)}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-           <div className="col-span-2 bg-slate-800/30 rounded-2xl p-4 border border-slate-800 flex justify-between items-center">
+
+            {/* YEARLY SECTION */}
+            <div className="mb-6">
+              <h3 className={`text-xl font-bold tracking-tight mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Yearly Pay</h3>
+              
+              <div className="grid grid-cols-2 gap-3">
+                 {/* Gross Yearly */}
+                 <div className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-slate-50 border border-slate-100'}`}>
+                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Gross Yearly
+                  </span>
+                  <span className={`block text-lg font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(results.grossYearly)}
+                  </span>
+                </div>
+
+                {/* Take Home Yearly */}
+                 <div className={`p-4 rounded-2xl ${isDark ? 'bg-emerald-900/20 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
+                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    Take-Home Yearly
+                  </span>
+                  <span className={`block text-lg font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>
+                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(results.netYearly)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* TAX FOOTER */}
+            <div className={`pt-4 border-t flex justify-between items-end ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
               <div>
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Gross Yearly</span>
-                <span className="text-xl font-semibold text-slate-200">
-                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(results.grossYearly)}
-                </span>
+                <span className={`block text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Estimated Yearly Tax</span>
+                <span className={`block text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Based on your tax estimate — rough guide only.</span>
               </div>
-              <div className="text-right">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Hours</span>
-                <span className="text-xl font-semibold text-slate-200">
-                  {results.effectiveHourlyRate > 0 
-                     ? ((results.grossWeekly / results.effectiveHourlyRate)).toFixed(1)
-                     : '0' 
-                  } <span className="text-sm font-normal text-slate-500">/ wk</span>
-                </span>
+              <div className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                 {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(yearlyTax)}
               </div>
-           </div>
+            </div>
+
+          </div>
         </section>
 
       </div>
