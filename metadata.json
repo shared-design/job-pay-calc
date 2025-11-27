@@ -1,0 +1,5 @@
+{
+  "name": "Job Pay Calc",
+  "description": "A mobile-first simplified job pay calculator that helps you instantly convert hourly rates and shifts into weekly and yearly income, with optional AI-powered tax estimation.",
+  "requestFramePermissions": []
+}
