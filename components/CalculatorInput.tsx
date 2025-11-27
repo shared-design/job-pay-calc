@@ -75,8 +75,8 @@ export const CalculatorInput: React.FC<CalculatorInputProps> = ({
             focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500
             transition-all duration-200 text-lg font-semibold
             ${isDark 
-              ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-600' 
-              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+              ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-600 hover:border-slate-600' 
+              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 hover:border-slate-300 hover:bg-white'
             }`}
         />
         {suffix && (

@@ -416,8 +416,8 @@ const App: React.FC = () => {
                             type="number"
                             value={normal}
                             onChange={(e) => updateDayOverride(dayId, 'normalHours', parseFloat(e.target.value))}
-                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full
-                              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}
+                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full transition-colors
+                              ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-white'}
                             `}
                           />
                           
@@ -425,8 +425,8 @@ const App: React.FC = () => {
                             type="number"
                             value={ot}
                             onChange={(e) => updateDayOverride(dayId, 'overtimeHours', parseFloat(e.target.value))}
-                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full
-                              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}
+                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full transition-colors
+                              ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-white'}
                             `}
                           />
                           
@@ -440,8 +440,8 @@ const App: React.FC = () => {
                                 updateDayOverride(dayId, 'overtimeMultiplier', parseFloat(val));
                               }
                             }}
-                            className={`border rounded-lg p-1.5 text-xs focus:border-emerald-500 outline-none w-full appearance-none
-                              ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}
+                            className={`border rounded-lg p-1.5 text-xs focus:border-emerald-500 outline-none w-full appearance-none transition-colors
+                              ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-white'}
                             `}
                           >
                             <option value="1.5">1.5x</option>
