@@ -2,14 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { CalculatorInput } from './components/CalculatorInput';
 import { ResultCard } from './components/ResultCard';
 import { TaxAssistant } from './components/TaxAssistant';
-import { DollarSign, Clock, CalendarDays, Percent, AlertCircle, Info } from 'lucide-react';
-import { PayDetails, Frequency } from './types';
+import { JobTypeHelper } from './components/JobTypeHelper';
+import { DollarSign, Clock, CalendarDays, Percent, AlertCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { PayDetails, Frequency, PenaltyRates } from './types';
 import { loadSettings, loadLastInputs, saveSettings, saveLastInputs } from './services/storageService';
 
 const App: React.FC = () => {
   // Initialize state with values from storage or defaults
-  // We use lazy initialization to avoid reading from localStorage on every render
-  
   const [isCasual, setIsCasual] = useState<boolean>(() => {
     return loadSettings()?.isCasual ?? false;
   });
@@ -38,6 +37,21 @@ const App: React.FC = () => {
     return loadLastInputs()?.shiftsInput ?? '5';
   });
 
+  // Penalty States
+  const [showPenalties, setShowPenalties] = useState<boolean>(() => {
+    return loadLastInputs()?.showPenalties ?? false;
+  });
+
+  const [satRate, setSatRate] = useState<string>(() => loadLastInputs()?.satRate ?? '150');
+  const [satHours, setSatHours] = useState<string>(() => loadLastInputs()?.satHours ?? '0');
+  
+  const [sunRate, setSunRate] = useState<string>(() => loadLastInputs()?.sunRate ?? '200');
+  const [sunHours, setSunHours] = useState<string>(() => loadLastInputs()?.sunHours ?? '0');
+
+  const [otRate, setOtRate] = useState<string>(() => loadLastInputs()?.otRate ?? '150');
+  const [otHours, setOtHours] = useState<string>(() => loadLastInputs()?.otHours ?? '0');
+
+
   // Effect to save Settings when they change
   useEffect(() => {
     saveSettings({
@@ -53,15 +67,24 @@ const App: React.FC = () => {
       hourlyRate,
       paidHours,
       totalHours,
-      shiftsInput
+      shiftsInput,
+      satRate, satHours,
+      sunRate, sunHours,
+      otRate, otHours,
+      showPenalties
     });
-  }, [hourlyRate, paidHours, totalHours, shiftsInput]);
+  }, [hourlyRate, paidHours, totalHours, shiftsInput, satRate, satHours, sunRate, sunHours, otRate, otHours, showPenalties]);
+
+  const handleApplyAutoRates = (rates: PenaltyRates) => {
+    setSatRate(rates.saturday.toString());
+    setSunRate(rates.sunday.toString());
+    setOtRate(rates.overtime.toString());
+  };
 
   // Calculations
   const results = useMemo<PayDetails>(() => {
     const rate = parseFloat(hourlyRate) || 0;
     const pHours = parseFloat(paidHours) || 0;
-    // If total hours is empty or 0, default to paid hours for calculation safety
     const tHoursInput = parseFloat(totalHours);
     const tHours = (isNaN(tHoursInput) || tHoursInput === 0) ? pHours : tHoursInput;
     
@@ -69,21 +92,40 @@ const App: React.FC = () => {
     const rawShifts = parseFloat(shiftsInput) || 0;
     const shiftsPerWeek = shiftFrequency === 'fortnight' ? rawShifts / 2 : rawShifts;
     
-    const tax = parseFloat(taxRate) || 0;
+    // Base Calculation (Standard Shifts)
+    const baseWeeklyPaidHours = pHours * shiftsPerWeek;
+    const baseWeeklyTotalHours = tHours * shiftsPerWeek;
+    const baseGross = rate * baseWeeklyPaidHours;
 
-    const weeklyPaidHours = pHours * shiftsPerWeek;
-    const weeklyTotalHours = tHours * shiftsPerWeek;
+    // Penalty Calculations
+    // 1. Loadings (Sat/Sun): Assumed to be PART of the shifts, so we add the "top up" amount.
+    // e.g. 150% rate = 1.0 (already in baseGross) + 0.5 (loading)
+    const sRate = parseFloat(satRate) || 0;
+    const sHours = parseFloat(satHours) || 0;
+    const satLoadingAmount = sHours * rate * Math.max(0, (sRate - 100) / 100);
+
+    const suRate = parseFloat(sunRate) || 0;
+    const suHours = parseFloat(sunHours) || 0;
+    const sunLoadingAmount = suHours * rate * Math.max(0, (suRate - 100) / 100);
+
+    // 2. Overtime: Assumed to be EXTRA hours on top of shifts
+    const oRate = parseFloat(otRate) || 0;
+    const oHours = parseFloat(otHours) || 0;
+    const otAmount = oHours * rate * (oRate / 100);
     
-    const grossWeekly = rate * weeklyPaidHours;
+    const grossWeekly = baseGross + satLoadingAmount + sunLoadingAmount + otAmount;
     const grossYearly = grossWeekly * 52;
     
     // Simple tax calc
+    const tax = parseFloat(taxRate) || 0;
     const taxMultiplier = 1 - (tax / 100);
     const netWeekly = grossWeekly * taxMultiplier;
     const netYearly = grossYearly * taxMultiplier;
 
-    // Effective Rate: What you really earn per hour of your life spent at work
-    const effectiveHourlyRate = weeklyTotalHours > 0 ? grossWeekly / weeklyTotalHours : 0;
+    // Effective Rate: (Total Pay) / (Total Hours Worked)
+    // Total Hours = Base Shifts Hours + Overtime Hours (Sat/Sun hours are part of base shifts)
+    const finalTotalHours = baseWeeklyTotalHours + oHours;
+    const effectiveHourlyRate = finalTotalHours > 0 ? grossWeekly / finalTotalHours : 0;
 
     return {
       grossWeekly,
@@ -92,7 +134,7 @@ const App: React.FC = () => {
       netYearly,
       effectiveHourlyRate
     };
-  }, [hourlyRate, paidHours, totalHours, shiftsInput, shiftFrequency, taxRate]);
+  }, [hourlyRate, paidHours, totalHours, shiftsInput, shiftFrequency, taxRate, satRate, satHours, sunRate, sunHours, otRate, otHours]);
 
   // Check if there is a significant difference to show the "Real Rate" warning
   const showEffectiveRate = results.effectiveHourlyRate > 0 && 
@@ -193,10 +235,92 @@ const App: React.FC = () => {
               placeholder={paidHours || "8"} 
             />
           </div>
+          
           {/* Helper text for the split inputs */}
           <div className="-mt-3 mb-2 flex justify-between px-1">
              <span className="text-[10px] text-slate-500">Billable hours</span>
              <span className="text-[10px] text-slate-500">Includes unpaid breaks</span>
+          </div>
+
+          {/* Penalties & Overtime Section */}
+          <div className="border-t border-slate-800 pt-4">
+             <button 
+                onClick={() => setShowPenalties(!showPenalties)}
+                className="w-full flex justify-between items-center text-left text-sm font-semibold text-slate-300 hover:text-emerald-400 transition-colors py-2"
+             >
+                <span>Penalty Rates & Overtime</span>
+                {showPenalties ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+             </button>
+             
+             {showPenalties && (
+               <div className="mt-4 animate-in slide-in-from-top-2 fade-in space-y-4">
+                  
+                  <JobTypeHelper onApplyRates={handleApplyAutoRates} />
+
+                  <div className="grid grid-cols-[1fr_80px_80px] gap-2 items-end">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase pb-1">Type</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase pb-1">Rate %</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase pb-1">Hours</span>
+                      
+                      {/* Saturday */}
+                      <div className="text-sm font-medium text-slate-300 py-3 flex flex-col justify-center">
+                        Saturday
+                        <span className="text-[10px] text-slate-600 font-normal">In standard shifts</span>
+                      </div>
+                      <input 
+                        type="number" 
+                        value={satRate} 
+                        onChange={e => setSatRate(e.target.value)}
+                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      />
+                      <input 
+                        type="number" 
+                        value={satHours} 
+                        onChange={e => setSatHours(e.target.value)}
+                        placeholder="0"
+                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      />
+
+                      {/* Sunday */}
+                      <div className="text-sm font-medium text-slate-300 py-3 flex flex-col justify-center">
+                        Sunday
+                         <span className="text-[10px] text-slate-600 font-normal">In standard shifts</span>
+                      </div>
+                      <input 
+                        type="number" 
+                        value={sunRate} 
+                        onChange={e => setSunRate(e.target.value)}
+                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      />
+                      <input 
+                        type="number" 
+                        value={sunHours} 
+                        onChange={e => setSunHours(e.target.value)}
+                        placeholder="0"
+                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      />
+
+                      {/* Overtime */}
+                      <div className="text-sm font-medium text-slate-300 py-3 flex flex-col justify-center">
+                        Overtime
+                         <span className="text-[10px] text-slate-600 font-normal">Extra hours</span>
+                      </div>
+                      <input 
+                        type="number" 
+                        value={otRate} 
+                        onChange={e => setOtRate(e.target.value)}
+                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      />
+                      <input 
+                        type="number" 
+                        value={otHours} 
+                        onChange={e => setOtHours(e.target.value)}
+                        placeholder="0"
+                        className="bg-slate-800 border border-slate-700 rounded-lg p-2 text-center text-sm text-white focus:border-emerald-500 outline-none" 
+                      />
+                  </div>
+               </div>
+             )}
           </div>
 
           <div className="pt-4 border-t border-slate-800">
@@ -234,7 +358,7 @@ const App: React.FC = () => {
                 </span>
               </div>
               <p className="text-[10px] text-amber-300/60 mt-0.5">
-                adjusted for {(parseFloat(totalHours) - parseFloat(paidHours)).toFixed(1)}h unpaid time per shift
+                adjusted for unpaid breaks
               </p>
             </div>
           </div>
@@ -273,7 +397,10 @@ const App: React.FC = () => {
               <div className="text-right">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Work Hours</span>
                 <span className="text-xl font-semibold text-slate-200">
-                  {(parseFloat(totalHours) || parseFloat(paidHours) || 0) * (shiftFrequency === 'fortnight' ? (parseFloat(shiftsInput)||0)/2 : (parseFloat(shiftsInput)||0))} <span className="text-sm font-normal text-slate-500">/ wk</span>
+                  {results.effectiveHourlyRate > 0 
+                     ? (results.grossWeekly / results.effectiveHourlyRate).toFixed(1)
+                     : '0' 
+                  } <span className="text-sm font-normal text-slate-500">/ wk</span>
                 </span>
               </div>
            </div>

@@ -11,6 +11,14 @@ export interface UserInputs {
   paidHours: string;
   totalHours: string;
   shiftsInput: string;
+  // Penalty configs
+  satRate?: string;
+  satHours?: string;
+  sunRate?: string;
+  sunHours?: string;
+  otRate?: string;
+  otHours?: string;
+  showPenalties?: boolean;
 }
 
 const KEYS = {
