@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { CalculatorInput } from './components/CalculatorInput';
 import { RosterHelper } from './components/RosterHelper';
+import { AnimatedCurrency } from './components/AnimatedCurrency';
 import { DollarSign, Clock, CalendarDays, Percent, AlertCircle, Info, ChevronDown, ChevronUp, Sun, Moon } from 'lucide-react';
 import { PayDetails, RosterPattern, DayOverrides } from './types';
 import { loadSettings, loadLastInputs, saveSettings, saveLastInputs } from './services/storageService';
@@ -227,9 +228,39 @@ const App: React.FC = () => {
              {isDark ? <Sun size={20} /> : <Moon size={20} />}
            </button>
 
-          <div className={`inline-flex items-center justify-center p-3 rounded-2xl mb-2 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-100'}`}>
-            <DollarSign className={`w-8 h-8 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+          {/* LOGO START */}
+          <div className="flex justify-center mb-6">
+            <div className="relative w-24 h-24">
+              <svg 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="1.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="w-full h-full text-orange-500"
+              >
+                {/* Document / Pay Stub Outline */}
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                
+                {/* Dollar Sign (Simpler, cleaner path) */}
+                <line x1="12" y1="4" x2="12" y2="10" />
+                <path d="M14 5.5c0-1.2-1.2-1.5-2-1.5s-2 .8-2 1.5c0 2 4 1.5 4 3.5s-1.2 1.5-2 1.5s-2-.8-2-1.5" />
+
+                {/* 3 Lines (Data) */}
+                <line x1="7" y1="13" x2="17" y2="13" />
+                <line x1="7" y1="16" x2="17" y2="16" />
+                <line x1="7" y1="19" x2="13" y2="19" />
+                
+                {/* Checkmark Circle Badge (Bottom Right Overlay) */}
+                <circle cx="18" cy="18" r="5" fill={isDark ? '#020617' : '#f1f5f9'} stroke="currentColor" />
+                <path d="M16 18l1.5 1.5 2.5-2.5" />
+              </svg>
+            </div>
           </div>
+          {/* LOGO END */}
+
           <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>PocketPay</h1>
           <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Job Pay Calculator</p>
         </header>
@@ -453,7 +484,7 @@ const App: React.FC = () => {
               <p className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>Real Hourly Rate</p>
               <div className="flex items-baseline gap-2">
                 <span className={`text-2xl font-bold ${isDark ? 'text-amber-50' : 'text-amber-900'}`}>
-                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(results.effectiveHourlyRate)}
+                  <AnimatedCurrency value={results.effectiveHourlyRate} />
                 </span>
                 <span className={`text-xs line-through ${isDark ? 'text-amber-400/70' : 'text-amber-700/50'}`}>
                   {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(hourlyRate) || 0)}
@@ -486,7 +517,7 @@ const App: React.FC = () => {
                     Gross Weekly
                   </span>
                   <span className={`block text-lg font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(results.grossWeekly)}
+                    <AnimatedCurrency value={results.grossWeekly} />
                   </span>
                 </div>
                 
@@ -496,7 +527,7 @@ const App: React.FC = () => {
                     Take-Home Weekly
                   </span>
                   <span className={`block text-xl font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>
-                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(results.netWeekly)}
+                     <AnimatedCurrency value={results.netWeekly} />
                   </span>
                 </div>
               </div>
@@ -513,7 +544,7 @@ const App: React.FC = () => {
                     Gross Yearly
                   </span>
                   <span className={`block text-lg font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(results.grossYearly)}
+                     <AnimatedCurrency value={results.grossYearly} maximumFractionDigits={0} />
                   </span>
                 </div>
 
@@ -523,7 +554,7 @@ const App: React.FC = () => {
                     Take-Home Yearly
                   </span>
                   <span className={`block text-lg font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>
-                     {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(results.netYearly)}
+                     <AnimatedCurrency value={results.netYearly} maximumFractionDigits={0} />
                   </span>
                 </div>
               </div>
@@ -536,7 +567,7 @@ const App: React.FC = () => {
                 <span className={`block text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Based on your tax estimate — rough guide only.</span>
               </div>
               <div className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                 {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(yearlyTax)}
+                 <AnimatedCurrency value={yearlyTax} maximumFractionDigits={0} />
               </div>
             </div>
 
