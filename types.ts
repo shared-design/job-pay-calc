@@ -1,5 +1,3 @@
-export type Frequency = 'week' | 'fortnight';
-
 export interface PayDetails {
   grossWeekly: number;
   grossYearly: number;
@@ -13,6 +11,19 @@ export interface TaxEstimateResponse {
   explanation: string;
 }
 
+export interface JobRateSuggestionResponse {
+  category: string;
+  rates: {
+    night: number;
+    saturday: number;
+    sunday: number;
+    publicHoliday: number;
+    overtime1: number;
+    overtime2: number;
+  };
+  reasoning: string;
+}
+
 export enum TaxStatus {
   IDLE = 'IDLE',
   LOADING = 'LOADING',
@@ -20,25 +31,12 @@ export enum TaxStatus {
   ERROR = 'ERROR'
 }
 
-export type JobCategory = 
-  | 'Transport / Trucking' 
-  | 'Warehouse / Logistics' 
-  | 'Healthcare' 
-  | 'Retail' 
-  | 'Hospitality' 
-  | 'General';
+export type RosterPattern = 'same_days' | 'different_days';
 
-export interface PenaltyRates {
-  night: number;
-  saturday: number;
-  sunday: number;
-  publicHoliday: number;
-  overtime1: number;
-  overtime2: number;
+export interface ShiftDetail {
+  normalHours: number;
+  overtimeHours: number;
+  overtimeMultiplier: number;
 }
 
-export interface JobRateSuggestionResponse {
-  category: JobCategory;
-  rates: PenaltyRates;
-  reasoning: string;
-}
+export type DayOverrides = Record<string, ShiftDetail>;

@@ -1,35 +1,27 @@
-import { Frequency } from "../types";
+import { RosterPattern, DayOverrides } from "../types";
 
 export interface AppSettings {
   isCasual: boolean;
-  shiftFrequency: Frequency;
   taxRate: string;
 }
 
 export interface UserInputs {
   hourlyRate: string;
-  paidHours: string;
-  totalHours: string;
-  shiftsInput: string;
-  // Penalty configs
-  nightRate?: string;
-  nightHours?: string;
-  satRate?: string;
-  satHours?: string;
-  sunRate?: string;
-  sunHours?: string;
-  phRate?: string;
-  phHours?: string;
-  ot1Rate?: string;
-  ot1Hours?: string;
-  ot2Rate?: string;
-  ot2Hours?: string;
   
-  // Legacy fields
-  otRate?: string;
-  otHours?: string;
-
-  showPenalties?: boolean;
+  // New simplified inputs
+  shiftHours: string;
+  isBreakPaid: boolean;
+  unpaidBreakLength: string;
+  
+  shiftsInput: string;
+  
+  // Roster
+  rosterPattern?: RosterPattern;
+  customRosterDays?: string[]; // ['Mon', 'Tue', etc]
+  
+  // New Overtime/Grid state
+  showOvertimeDetails?: boolean;
+  dayOverrides?: DayOverrides;
 }
 
 const KEYS = {
