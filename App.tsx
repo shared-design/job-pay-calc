@@ -7,8 +7,8 @@ import { PayDetails, RosterPattern, DayOverrides } from './types';
 import { loadSettings, loadLastInputs, saveSettings, saveLastInputs } from './services/storageService';
 
 const App: React.FC = () => {
-  // Theme State
-  const [isDark, setIsDark] = useState<boolean>(true);
+  // Theme State - Defaulting to Light for BARRI theme but allowing toggle
+  const [isDark, setIsDark] = useState<boolean>(false);
 
   // Initialize state with values from storage or defaults
   const [isCasual, setIsCasual] = useState<boolean>(() => {
@@ -133,10 +133,12 @@ const App: React.FC = () => {
   const results = useMemo<PayDetails>(() => {
     const rate = parseFloat(hourlyRate) || 0;
     const netShiftHours = getNetShiftHours();
+    const rawShiftHours = parseFloat(shiftHours) || 0; // Total time at work (Presence)
     
     let totalNormalHours = 0;
     let totalOvertimePay = 0; 
-    let totalWorkHours = 0; // Actual time worked (for effective rate)
+    let totalPaidHours = 0; // Hours you are paid for (Net)
+    let totalPresenceHours = 0; // Hours you are physically at work (Gross)
 
     // Identify the list of "Shifts" to iterate over
     let shifts: string[] = [];
@@ -149,8 +151,11 @@ const App: React.FC = () => {
 
     if (!showOvertimeDetails) {
       // SIMPLE MODE
-      totalWorkHours = netShiftHours * shifts.length;
-      totalNormalHours = totalWorkHours; 
+      totalPaidHours = netShiftHours * shifts.length;
+      totalNormalHours = totalPaidHours; 
+      
+      // In simple mode, presence is just raw shift length * days
+      totalPresenceHours = rawShiftHours * shifts.length;
     } else {
       // ADVANCED MODE (Grid)
       shifts.forEach(dayId => {
@@ -173,7 +178,11 @@ const App: React.FC = () => {
 
         totalNormalHours += normal;
         totalOvertimePay += (ot * rate * mult);
-        totalWorkHours += (normal + ot);
+        const dayPaidHours = normal + ot;
+        totalPaidHours += dayPaidHours;
+        
+        const breakDuration = isBreakPaid ? 0 : (parseFloat(unpaidBreakLength) || 0);
+        totalPresenceHours += (dayPaidHours + breakDuration);
       });
     }
 
@@ -190,7 +199,8 @@ const App: React.FC = () => {
     const netWeekly = grossWeekly * taxMultiplier;
     const netYearly = grossYearly * taxMultiplier;
 
-    const effectiveHourlyRate = totalWorkHours > 0 ? grossWeekly / totalWorkHours : 0;
+    // Effective Rate = Gross Pay / Total Time At Work (Presence)
+    const effectiveHourlyRate = totalPresenceHours > 0 ? grossWeekly / totalPresenceHours : 0;
 
     return {
       grossWeekly,
@@ -198,7 +208,7 @@ const App: React.FC = () => {
       netWeekly,
       netYearly,
       effectiveHourlyRate,
-      totalHours: totalWorkHours
+      totalHours: totalPaidHours
     };
   }, [hourlyRate, shiftHours, isBreakPaid, unpaidBreakLength, shiftsInput, rosterPattern, customRosterDays, showOvertimeDetails, dayOverrides, taxRate]);
 
@@ -210,88 +220,66 @@ const App: React.FC = () => {
   }, [rosterPattern, customRosterDays, shiftsInput]);
 
   const showEffectiveRate = results.effectiveHourlyRate > 0 && 
-    Math.abs(parseFloat(hourlyRate) - results.effectiveHourlyRate) > 0.01;
+    Math.abs(parseFloat(hourlyRate) - results.effectiveHourlyRate) > 0.05;
 
   const yearlyTax = results.grossYearly - results.netYearly;
 
   return (
-    <div className={`min-h-screen flex flex-col items-center py-6 px-4 md:py-12 transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-slate-100'}`}>
-      <div className="w-full max-w-md space-y-6">
-        
-        {/* Header */}
-        <header className="relative text-center space-y-2 mb-8">
-           <button 
-             onClick={() => setIsDark(!isDark)}
-             className={`absolute top-0 right-0 p-2 rounded-full transition-colors ${isDark ? 'bg-slate-800 text-amber-400' : 'bg-white text-slate-600 shadow-sm border border-slate-200'}`}
-             aria-label="Toggle theme"
-           >
-             {isDark ? <Sun size={20} /> : <Moon size={20} />}
-           </button>
-
-          {/* LOGO START */}
-          <div className="flex justify-center mb-6">
-            <div className="relative w-24 h-24">
-              <svg 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="1.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="w-full h-full text-orange-500"
-              >
-                {/* Document / Pay Stub Outline */}
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                
-                {/* Dollar Sign (Simpler, cleaner path) */}
-                <line x1="12" y1="4" x2="12" y2="10" />
-                <path d="M14 5.5c0-1.2-1.2-1.5-2-1.5s-2 .8-2 1.5c0 2 4 1.5 4 3.5s-1.2 1.5-2 1.5s-2-.8-2-1.5" />
-
-                {/* 3 Lines (Data) */}
-                <line x1="7" y1="13" x2="17" y2="13" />
-                <line x1="7" y1="16" x2="17" y2="16" />
-                <line x1="7" y1="19" x2="13" y2="19" />
-                
-                {/* Checkmark Circle Badge (Bottom Right Overlay) */}
-                <circle cx="18" cy="18" r="5" fill={isDark ? '#020617' : '#f1f5f9'} stroke="currentColor" />
-                <path d="M16 18l1.5 1.5 2.5-2.5" />
-              </svg>
-            </div>
+    <div className={`min-h-screen flex flex-col items-center pb-12 font-sans transition-colors duration-300 ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
+      
+      {/* BARRI HEADER */}
+      <header className={`w-full shadow-sm border-b sticky top-0 z-50 transition-colors duration-300 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className="max-w-md mx-auto px-4 py-2 flex justify-center items-center h-24 relative">
+          
+          <div className="h-20 w-auto flex items-center justify-center">
+            <img 
+              src="/barri_logo.png" 
+              alt="BARRI" 
+              className="h-full w-auto object-contain"
+            />
           </div>
-          {/* LOGO END */}
 
-          <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>PocketPay</h1>
-          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Job Pay Calculator</p>
-        </header>
+          {/* Theme Toggle */}
+          <button 
+            onClick={() => setIsDark(!isDark)}
+            className={`absolute right-4 p-2.5 rounded-full transition-all duration-300 hover:scale-110 ${isDark ? 'bg-slate-800 text-orange-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:text-orange-500'}`}
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+        </div>
+      </header>
 
-        {/* Calculator Inputs */}
-        <section className={`p-6 rounded-3xl border shadow-xl space-y-5 transition-colors duration-300 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-slate-200/50'}`}>
+      <div className="w-full max-w-md space-y-6 px-4 pt-6">
+        
+        {/* INPUTS CARD */}
+        <section className={`p-6 md:p-8 rounded-[2rem] shadow-xl space-y-6 border transition-colors duration-300 
+          ${isDark ? 'bg-slate-800 border-slate-700 shadow-black/40' : 'bg-white border-slate-100 shadow-slate-200/60'}`}>
           
           {/* Employment Type Toggle */}
           <div className="flex flex-col gap-3">
-            <div className={`flex p-1 rounded-xl border relative ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+            <div className={`flex p-1.5 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
               <button
                 onClick={() => setIsCasual(false)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 z-10 
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-200 font-heading
                   ${!isCasual 
-                    ? (isDark ? 'bg-slate-700 text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm border border-slate-200') 
-                    : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}
+                    ? (isDark ? 'bg-slate-800 text-white shadow-sm border border-slate-700' : 'bg-white text-slate-800 shadow-sm ring-1 ring-black/5')
+                    : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')}`}
               >
                 Permanent
               </button>
               <button
                 onClick={() => setIsCasual(true)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-200 z-10 
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-200 font-heading
                   ${isCasual 
-                    ? 'bg-emerald-600 text-white shadow-sm' 
-                    : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}
+                    ? 'bg-green-500 text-white shadow-sm shadow-green-500/30' 
+                    : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')}`}
               >
                 Casual
               </button>
             </div>
             {isCasual && (
-              <div className={`flex items-start gap-2 px-1 text-xs ${isDark ? 'text-emerald-400/90' : 'text-emerald-700/90'}`}>
+              <div className="flex items-start gap-2 px-2 text-xs text-green-500 font-bold">
                 <Info size={14} className="mt-0.5 shrink-0" />
                 <p>Casual rates usually include a ~25% loading.</p>
               </div>
@@ -326,7 +314,7 @@ const App: React.FC = () => {
             />
           )}
           
-          <div className={`border-t my-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}></div>
+          <div className={`border-t my-2 ${isDark ? 'border-slate-700' : 'border-slate-100'}`}></div>
 
           {/* Shift Details */}
           <CalculatorInput
@@ -340,19 +328,19 @@ const App: React.FC = () => {
 
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-center px-1">
-              <label className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Is your meal break paid?
+              <label className={`text-xs font-bold uppercase tracking-wider font-heading ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>
+                Meal break paid?
               </label>
-              <div className={`flex rounded-lg p-0.5 border ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
+              <div className={`flex rounded-xl p-1 border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
                 <button 
                   onClick={() => setIsBreakPaid(true)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${isBreakPaid ? 'bg-emerald-600 text-white' : (isDark ? 'text-slate-500' : 'text-slate-500')}`}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${isBreakPaid ? 'bg-green-500 text-white shadow-sm shadow-green-500/30' : (isDark ? 'text-slate-500 hover:text-white' : 'text-slate-500 hover:text-slate-700')}`}
                 >
                   Yes
                 </button>
                 <button 
                   onClick={() => setIsBreakPaid(false)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${!isBreakPaid ? (isDark ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-500'}`}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${!isBreakPaid ? (isDark ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-700 shadow-sm') : (isDark ? 'text-slate-500 hover:text-white' : 'text-slate-500 hover:text-slate-700')}`}
                 >
                   No
                 </button>
@@ -360,7 +348,7 @@ const App: React.FC = () => {
             </div>
 
             {!isBreakPaid && (
-              <div className="animate-in fade-in slide-in-from-top-1 mt-1">
+              <div className="animate-in fade-in slide-in-from-top-1 mt-2">
                 <CalculatorInput
                   label="Break Length (Hours)"
                   value={unpaidBreakLength}
@@ -369,7 +357,7 @@ const App: React.FC = () => {
                   step="0.1"
                   isDark={isDark}
                 />
-                <p className={`text-[10px] px-1 mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                <p className={`text-[10px] px-1 mt-1.5 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   We've assumed a 30 minute unpaid break. Adjust if needed.
                 </p>
               </div>
@@ -377,12 +365,12 @@ const App: React.FC = () => {
           </div>
 
           {/* Overtime & Detailed Breakdown Toggle */}
-          <div className={`border-t pt-4 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+          <div className={`border-t pt-4 ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
              <button 
                 onClick={() => setShowOvertimeDetails(!showOvertimeDetails)}
-                className={`w-full flex justify-between items-center text-left text-sm font-semibold transition-colors py-2 ${isDark ? 'text-slate-300 hover:text-emerald-400' : 'text-slate-700 hover:text-emerald-600'}`}
+                className={`w-full flex justify-between items-center text-left text-sm font-bold transition-colors py-2 group font-heading ${isDark ? 'text-slate-400 hover:text-orange-400' : 'text-slate-500 hover:text-orange-500'}`}
              >
-                <span>Penalty Rates & Overtime</span>
+                <span className="group-hover:translate-x-1 transition-transform">Penalty Rates & Overtime</span>
                 {showOvertimeDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
              </button>
              
@@ -391,14 +379,14 @@ const App: React.FC = () => {
                   
                   {/* Grid Header */}
                   <div className={`grid grid-cols-[1fr_60px_60px_70px] gap-2 items-center text-center px-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                     <div className="text-[10px] font-bold uppercase text-left">Day</div>
-                     <div className="text-[10px] font-bold uppercase leading-3">Normal Hrs</div>
-                     <div className="text-[10px] font-bold uppercase leading-3">OT Hrs</div>
-                     <div className="text-[10px] font-bold uppercase leading-3">OT Type</div>
+                     <div className="text-[10px] font-bold uppercase text-left tracking-wider">Day</div>
+                     <div className="text-[10px] font-bold uppercase leading-3 tracking-wider">Normal</div>
+                     <div className="text-[10px] font-bold uppercase leading-3 tracking-wider">OT Hrs</div>
+                     <div className="text-[10px] font-bold uppercase leading-3 tracking-wider">Rate</div>
                   </div>
 
                   {/* Grid Rows */}
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {gridRows.map((dayId) => {
                       const override = dayOverrides[dayId];
                       const net = getNetShiftHours();
@@ -409,15 +397,17 @@ const App: React.FC = () => {
                       const mult = override?.overtimeMultiplier ?? def.mult;
 
                       return (
-                        <div key={dayId} className="grid grid-cols-[1fr_60px_60px_70px] gap-2 items-center">
-                          <span className={`text-sm font-medium truncate pl-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{dayId}</span>
+                        <div key={dayId} className="grid grid-cols-[1fr_60px_60px_70px] gap-2 items-center group">
+                          <span className={`text-sm font-bold truncate pl-1 ${isDark ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-600 group-hover:text-slate-800'}`}>{dayId}</span>
                           
                           <input 
                             type="number"
                             value={normal}
                             onChange={(e) => updateDayOverride(dayId, 'normalHours', parseFloat(e.target.value))}
-                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full transition-colors
-                              ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-white'}
+                            className={`border rounded-lg p-2 text-center text-xs font-bold focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 outline-none w-full transition-all
+                              ${isDark 
+                                ? 'bg-slate-900 border-slate-700 text-white hover:border-slate-500' 
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'}
                             `}
                           />
                           
@@ -425,8 +415,10 @@ const App: React.FC = () => {
                             type="number"
                             value={ot}
                             onChange={(e) => updateDayOverride(dayId, 'overtimeHours', parseFloat(e.target.value))}
-                            className={`border rounded-lg p-1.5 text-center text-xs focus:border-emerald-500 outline-none w-full transition-colors
-                              ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-white'}
+                            className={`border rounded-lg p-2 text-center text-xs font-bold focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 outline-none w-full transition-all
+                              ${isDark 
+                                ? 'bg-slate-900 border-slate-700 text-white hover:border-slate-500' 
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'}
                             `}
                           />
                           
@@ -440,8 +432,10 @@ const App: React.FC = () => {
                                 updateDayOverride(dayId, 'overtimeMultiplier', parseFloat(val));
                               }
                             }}
-                            className={`border rounded-lg p-1.5 text-xs focus:border-emerald-500 outline-none w-full appearance-none transition-colors
-                              ${isDark ? 'bg-slate-800 border-slate-700 text-white hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-white'}
+                            className={`border rounded-lg p-2 text-xs font-bold focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 outline-none w-full appearance-none transition-all cursor-pointer
+                              ${isDark 
+                                ? 'bg-slate-900 border-slate-700 text-white hover:border-slate-500' 
+                                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'}
                             `}
                           >
                             <option value="1.5">1.5x</option>
@@ -453,14 +447,14 @@ const App: React.FC = () => {
                     })}
                   </div>
 
-                  <p className={`text-[10px] italic px-1 pt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    This is a simple estimate only and does not calculate exact award overtime rules. Adjust the hours and overtime type to match your usual week.
+                  <p className={`text-[10px] font-medium italic px-1 pt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Estimate only. Adjust hours to match your week.
                   </p>
                </div>
              )}
           </div>
 
-          <div className={`pt-4 border-t ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+          <div className={`pt-4 border-t ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
              <CalculatorInput
               label="Tax Estimate (%)"
               value={taxRate}
@@ -476,57 +470,58 @@ const App: React.FC = () => {
 
         {/* Effective Rate Warning */}
         {showEffectiveRate && (
-          <div className={`border rounded-2xl p-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-500 ${isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
-            <div className={`p-2 rounded-full shrink-0 ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
-               <AlertCircle className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+          <div className={`border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in slide-in-from-top-4 duration-500 shadow-sm ${isDark ? 'bg-orange-900/10 border-orange-500/20' : 'bg-orange-50 border-orange-100'}`}>
+            <div className={`p-2.5 rounded-full shrink-0 ${isDark ? 'bg-orange-500/10 text-orange-400' : 'bg-orange-100 text-orange-500'}`}>
+               <AlertCircle className="w-6 h-6" />
             </div>
             <div>
-              <p className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-amber-200' : 'text-amber-800'}`}>Real Hourly Rate</p>
+              <p className={`text-xs font-extrabold uppercase tracking-wide font-heading ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>Real Hourly Rate</p>
               <div className="flex items-baseline gap-2">
-                <span className={`text-2xl font-bold ${isDark ? 'text-amber-50' : 'text-amber-900'}`}>
+                <span className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>
                   <AnimatedCurrency value={results.effectiveHourlyRate} />
                 </span>
-                <span className={`text-xs line-through ${isDark ? 'text-amber-400/70' : 'text-amber-700/50'}`}>
+                <span className={`text-sm line-through font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(hourlyRate) || 0)}
                 </span>
               </div>
-              <p className={`text-[10px] mt-0.5 ${isDark ? 'text-amber-300/60' : 'text-amber-800/60'}`}>
+              <p className={`text-[11px] mt-0.5 font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 adjusted for breaks & penalties
               </p>
             </div>
           </div>
         )}
 
-        {/* UNIFIED RESULTS CARD */}
-        <section className={`rounded-3xl border shadow-2xl overflow-hidden ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-          <div className="p-6">
+        {/* RESULTS CARD */}
+        <section className={`rounded-[2rem] shadow-xl overflow-hidden border mb-8 transition-colors duration-300
+          ${isDark ? 'bg-slate-800 border-slate-700 shadow-black/40' : 'bg-white border-slate-100 shadow-slate-200/60'}`}>
+          <div className="p-6 md:p-8">
             
             {/* WEEKLY SECTION */}
-            <div className="mb-6">
-              <h3 className={`text-xl font-bold tracking-tight mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>Weekly Pay</h3>
-              <div className={`pb-3 mb-4 border-b ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                 <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                   Total hours per week: <span className={isDark ? 'text-slate-200' : 'text-slate-700'}>{results.totalHours.toFixed(1)}</span>
+            <div className="mb-8">
+              <h3 className={`text-2xl font-extrabold tracking-tight mb-2 font-heading ${isDark ? 'text-white' : 'text-slate-800'}`}>Weekly Pay</h3>
+              <div className={`pb-4 mb-5 border-b ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
+                 <p className={`text-sm font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                   Total hours per week: <span className={isDark ? 'text-slate-200' : 'text-slate-800'}>{results.totalHours.toFixed(1)}</span>
                  </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 {/* Gross Weekly */}
-                <div className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-slate-50 border border-slate-100'}`}>
-                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                <div className={`p-5 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 font-heading ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     Gross Weekly
                   </span>
-                  <span className={`block text-lg font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  <span className="block text-xl md:text-2xl font-bold text-orange-500">
                     <AnimatedCurrency value={results.grossWeekly} />
                   </span>
                 </div>
                 
                 {/* Take Home Weekly */}
-                <div className={`p-4 rounded-2xl relative overflow-hidden ${isDark ? 'bg-emerald-900/20 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
-                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                <div className={`p-5 rounded-2xl border relative overflow-hidden group ${isDark ? 'bg-green-900/10 border-green-500/20' : 'bg-green-50 border-green-100'}`}>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-green-600 font-heading relative z-10">
                     Take-Home Weekly
                   </span>
-                  <span className={`block text-xl font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>
+                  <span className={`block text-2xl md:text-3xl font-black relative z-10 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                      <AnimatedCurrency value={results.netWeekly} />
                   </span>
                 </div>
@@ -535,25 +530,25 @@ const App: React.FC = () => {
 
             {/* YEARLY SECTION */}
             <div className="mb-6">
-              <h3 className={`text-xl font-bold tracking-tight mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>Yearly Pay</h3>
+              <h3 className={`text-2xl font-extrabold tracking-tight mb-5 font-heading ${isDark ? 'text-white' : 'text-slate-800'}`}>Yearly Pay</h3>
               
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                  {/* Gross Yearly */}
-                 <div className={`p-4 rounded-2xl ${isDark ? 'bg-slate-800' : 'bg-slate-50 border border-slate-100'}`}>
-                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                 <div className={`p-5 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1.5 font-heading ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     Gross Yearly
                   </span>
-                  <span className={`block text-lg font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  <span className="block text-lg md:text-xl font-bold text-orange-500">
                      <AnimatedCurrency value={results.grossYearly} maximumFractionDigits={0} />
                   </span>
                 </div>
 
                 {/* Take Home Yearly */}
-                 <div className={`p-4 rounded-2xl ${isDark ? 'bg-emerald-900/20 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
-                  <span className={`block text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                 <div className={`p-5 rounded-2xl border ${isDark ? 'bg-green-900/10 border-green-500/20' : 'bg-green-50 border-green-100'}`}>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider mb-1.5 text-green-600 font-heading">
                     Take-Home Yearly
                   </span>
-                  <span className={`block text-lg font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>
+                  <span className={`block text-lg md:text-xl font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>
                      <AnimatedCurrency value={results.netYearly} maximumFractionDigits={0} />
                   </span>
                 </div>
@@ -561,12 +556,12 @@ const App: React.FC = () => {
             </div>
 
             {/* TAX FOOTER */}
-            <div className={`pt-4 border-t flex justify-between items-end ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+            <div className={`pt-5 border-t flex justify-between items-end ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
               <div>
-                <span className={`block text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Estimated Yearly Tax</span>
-                <span className={`block text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Based on your tax estimate — rough guide only.</span>
+                <span className={`block text-sm font-bold font-heading ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Estimated Yearly Tax</span>
+                <span className={`block text-[11px] font-medium mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Based on your tax estimate.</span>
               </div>
-              <div className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <div className={`text-base font-bold ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
                  <AnimatedCurrency value={yearlyTax} maximumFractionDigits={0} />
               </div>
             </div>

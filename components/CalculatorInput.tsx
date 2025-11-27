@@ -28,25 +28,20 @@ export const CalculatorInput: React.FC<CalculatorInputProps> = ({
   headerAction,
   type = "number",
   tooltip,
-  isDark = true
+  isDark = false
 }) => {
   return (
-    <div className="flex flex-col gap-1.5 w-full">
+    <div className="flex flex-col gap-2 w-full">
       <div className="flex justify-between items-center px-1">
         <div className="flex items-center gap-1.5">
-          <label className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <label className={`text-xs font-bold uppercase tracking-wider font-heading ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>
             {label}
           </label>
           {tooltip && (
             <div className="group relative flex items-center">
-              <Info size={12} className={`${isDark ? 'text-slate-500 hover:text-emerald-400' : 'text-slate-400 hover:text-emerald-600'} cursor-help transition-colors`} />
-              <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] px-2.5 py-1.5 border text-[10px] rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all pointer-events-none z-50
-                ${isDark 
-                  ? 'bg-slate-800 border-slate-700 text-slate-200' 
-                  : 'bg-white border-slate-200 text-slate-700'
-                }`}>
+              <Info size={13} className={`${isDark ? 'text-slate-500 hover:text-orange-400' : 'text-slate-300 hover:text-orange-500'} cursor-help transition-colors`} />
+              <div className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] px-3 py-2 border text-[11px] rounded-xl shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all pointer-events-none z-50 font-medium ${isDark ? 'bg-slate-800 border-slate-600 text-slate-200' : 'bg-slate-800 border-slate-700 text-white'}`}>
                 {tooltip}
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent ${isDark ? 'border-t-slate-800' : 'border-t-white'}`}></div>
               </div>
             </div>
           )}
@@ -55,11 +50,7 @@ export const CalculatorInput: React.FC<CalculatorInputProps> = ({
       </div>
       <div className="relative group">
         {icon && (
-          <div className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
-            isDark 
-              ? 'text-slate-500 group-focus-within:text-emerald-400' 
-              : 'text-slate-400 group-focus-within:text-emerald-600'
-          }`}>
+          <div className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-orange-500 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {icon}
           </div>
         )}
@@ -70,17 +61,16 @@ export const CalculatorInput: React.FC<CalculatorInputProps> = ({
           placeholder={placeholder}
           step={step}
           min={min}
-          className={`w-full border rounded-xl py-3.5 
-            ${icon ? 'pl-10' : 'pl-4'} ${suffix ? 'pr-12' : 'pr-4'}
-            focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500
-            transition-all duration-200 text-lg font-semibold
+          className={`w-full rounded-2xl py-3.5 border transition-all duration-200 text-lg font-bold shadow-sm
+            ${icon ? 'pl-11' : 'pl-4'} ${suffix ? 'pr-12' : 'pr-4'}
+            focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10
             ${isDark 
-              ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-600 hover:border-slate-600' 
-              : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 hover:border-slate-300 hover:bg-white'
-            }`}
+              ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-600 hover:border-slate-500' 
+              : 'bg-slate-50 border-slate-200 text-slate-700 placeholder-slate-300 hover:border-slate-300 hover:bg-white'}
+          `}
         />
         {suffix && (
-          <div className={`absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <div className={`absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {suffix}
           </div>
         )}
