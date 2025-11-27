@@ -1,0 +1,76 @@
+import React from 'react';
+import { Info } from 'lucide-react';
+
+interface CalculatorInputProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  icon?: React.ReactNode;
+  placeholder?: string;
+  step?: string;
+  min?: string;
+  suffix?: string;
+  headerAction?: React.ReactNode;
+  type?: 'text' | 'number';
+  tooltip?: string;
+}
+
+export const CalculatorInput: React.FC<CalculatorInputProps> = ({
+  label,
+  value,
+  onChange,
+  icon,
+  placeholder,
+  step = "1",
+  min = "0",
+  suffix,
+  headerAction,
+  type = "number",
+  tooltip
+}) => {
+  return (
+    <div className="flex flex-col gap-1.5 w-full">
+      <div className="flex justify-between items-center px-1">
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            {label}
+          </label>
+          {tooltip && (
+            <div className="group relative flex items-center">
+              <Info size={12} className="text-slate-500 hover:text-emerald-400 cursor-help transition-colors" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] px-2.5 py-1.5 bg-slate-800 border border-slate-700 text-slate-200 text-[10px] rounded-lg shadow-xl opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all pointer-events-none z-50">
+                {tooltip}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+              </div>
+            </div>
+          )}
+        </div>
+        {headerAction}
+      </div>
+      <div className="relative group">
+        {icon && (
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-400 transition-colors">
+            {icon}
+          </div>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          step={step}
+          min={min}
+          className={`w-full bg-slate-800 border border-slate-700 text-white rounded-xl py-3.5 
+            ${icon ? 'pl-10' : 'pl-4'} ${suffix ? 'pr-12' : 'pr-4'}
+            focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500
+            transition-all duration-200 placeholder-slate-600 text-lg font-semibold`}
+        />
+        {suffix && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">
+            {suffix}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
